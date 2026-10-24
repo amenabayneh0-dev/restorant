@@ -4,7 +4,7 @@ import type { Hours } from "./hours";
 export type Option = { id: string; group_name: string; name: string; extra_price: number; is_available: boolean; sort_order: number };
 export type Item = { id: string; category_id: string; name: string; slug: string; description: string; price: number; is_featured: boolean; is_available: boolean; menu_item_options: Option[] };
 export type Category = { id: string; name: string; slug: string; description: string | null; items: Item[] };
-export type Settings = { name: string; description: string; phone: string | null; address: string | null; currency_code: string; timezone: string; opening_hours: Hours; accepting_orders: boolean; delivery_enabled: boolean; delivery_fee: number };
+export type Settings = { name: string; description: string; phone: string | null; address: string | null; currency_code: string; timezone: string; opening_hours: Hours; accepting_orders: boolean; delivery_enabled: boolean; enabled_fulfillment: string[]; delivery_fee: number };
 
 export async function getMenu(): Promise<{ settings: Settings; categories: Category[] }> {
   const db = publicClient();

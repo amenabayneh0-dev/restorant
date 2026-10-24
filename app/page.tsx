@@ -1,6 +1,8 @@
 import { getMenu } from "@/lib/menu";
 import { formatMoney } from "@/lib/money";
 import { openStatus } from "@/lib/hours";
+import { AddButton } from "@/components/AddButton";
+import { CartBar } from "@/components/CartBar";
 
 export const dynamic = "force-dynamic";
 
@@ -46,12 +48,15 @@ export default async function Home() {
                   {it.menu_item_options.length > 0 && (
                     <p className="opts">Choices: {it.menu_item_options.map((o) => o.name + (o.extra_price > 0 ? ` (+${formatMoney(o.extra_price, cur)})` : "")).join(", ")}</p>
                   )}
+                  {it.is_available && s.accepting_orders && <AddButton item={it} currency={cur} />}
                 </li>
               ))}
             </ul>
           </section>
         ))}
       </main>
+
+      <CartBar currency={cur} deliveryFee={Number(s.delivery_fee)} fulfillment={s.enabled_fulfillment.filter((m) => m !== "delivery" || s.delivery_enabled)} open={s.accepting_orders} />
 
       <footer className="foot">
         <div className="wrap">

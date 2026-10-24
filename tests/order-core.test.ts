@@ -53,3 +53,31 @@ describe("error messages", () => {
   it("maps known codes", () => expect(friendlyOrderError("RESTAURANT_NOT_ACCEPTING")).toMatch(/not taking orders/));
   it("hides unknown database errors", () => expect(friendlyOrderError("relation orders violates constraint")).toBe("We couldn't place your order. Please try again."));
 });
+
+import { addLine, setQuantity, subtotal, itemCount } from "../lib/cart";
+import { stepIndex, isFinal } from "../lib/status";
+const L = { itemId: "i1", name: "Tibs", unitPrice: 450, quantity: 1, optionIds: ["a"], optionNames: ["Extra injera"] };
+describe("cart", () => {
+  it("merges identical lines and keeps different options separate", () => {
+    let c = addLine([], L); c = addLine(c, L); c = addLine(c, { ...L, optionIds: [] });
+    expect(c).toHaveLength(2); expect(c[0].quantity).toBe(2);
+  });
+  it("option order does not create a new line", () => {
+    const c = addLine(addLine([], { ...L, optionIds: ["a", "b"] }), { ...L, optionIds: ["b", "a"] });
+    expect(c).toHaveLength(1);
+  });
+  it("caps at 99 and removes at zero", () => {
+    let c = addLine([], { ...L, quantity: 98 }); c = addLine(c, { ...L, quantity: 5 });
+    expect(c[0].quantity).toBe(99); expect(setQuantity(c, c[0].key, 0)).toHaveLength(0);
+  });
+  it("totals without floating point drift", () => {
+    const c = addLine(addLine([], { ...L, unitPrice: 0.1, optionIds: [] }), { ...L, itemId: "i2", unitPrice: 0.2, optionIds: [], quantity: 1 });
+    expect(subtotal(c)).toBe(0.3); expect(itemCount(c)).toBe(2);
+  });
+});
+describe("status", () => {
+  it("knows progress and final states", () => {
+    expect(stepIndex("preparing")).toBe(2); expect(stepIndex("rejected")).toBe(-1);
+    expect(isFinal("cancelled")).toBe(true); expect(isFinal("ready")).toBe(false);
+  });
+});
