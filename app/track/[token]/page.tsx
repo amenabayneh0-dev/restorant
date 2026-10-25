@@ -15,7 +15,8 @@ type Tracking = { reference: string; status: string; fulfillment: string; subtot
 export default async function Track({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   if (!isPlausibleToken(token)) notFound();
-  const { data } = await adminClient().rpc("get_order_tracking", { p_token_hash: hashToken(token) });
+  const { data, error } = await adminClient().rpc("get_order_tracking", { p_token_hash: hashToken(token) });
+  if (error) { console.error("[track] lookup failed:", error.message); throw new Error("Could not load your order"); }
   if (!data) notFound();
   const o = data as Tracking;
   const at = stepIndex(o.status);

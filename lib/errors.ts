@@ -6,6 +6,7 @@ const MESSAGES: Record<string, string> = {
   INVALID_OPTION: "One of your extras is no longer available. Review your cart and try again.",
   INVALID_QUANTITY: "One of the quantities is not valid.",
   INVALID_ITEMS: "Your cart is empty or too large.",
+  TOO_MANY_ORDERS: "You've placed several orders in a short time. Please wait a few minutes or call the restaurant.",
 };
 
 export function friendlyOrderError(message?: string): string {

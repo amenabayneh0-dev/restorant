@@ -3,6 +3,7 @@ import { formatMoney } from "@/lib/money";
 import { openStatus } from "@/lib/hours";
 import { AddButton } from "@/components/AddButton";
 import { CartBar } from "@/components/CartBar";
+import type { MenuSnapshot } from "@/lib/cart";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,10 @@ export default async function Home() {
   const { settings: s, categories } = await getMenu();
   const status = openStatus(s.opening_hours, s.timezone);
   const cur = s.currency_code;
+  const snapshot: MenuSnapshot = Object.fromEntries(categories.flatMap((c) => c.items).map((it) => [it.id, {
+    price: Number(it.price), available: it.is_available,
+    options: Object.fromEntries(it.menu_item_options.map((o) => [o.id, { extra: Number(o.extra_price), available: o.is_available }])),
+  }]));
 
   return (
     <>
@@ -19,7 +24,7 @@ export default async function Home() {
         <div className="weave" aria-hidden="true" />
         <div className="wrap">
           <p className={status.open && s.accepting_orders ? "pill open" : "pill"}>
-            {!s.accepting_orders ? "Not taking orders right now" : status.open ? `Open now, until ${status.closesAt}` : status.opensAt ? `Closed, opens ${status.opensAt}` : "Closed today"}
+            {!s.accepting_orders ? "Not taking orders right now" : status.open ? `Open now, until ${status.closesAt}` : status.next ? `Closed, opens ${status.next}` : Object.keys(s.opening_hours).length ? "Closed today" : "Hours not set"}
           </p>
           <h1>{s.name}</h1>
           <p className="lede">{s.description}</p>
@@ -31,6 +36,7 @@ export default async function Home() {
       </nav>
 
       <main className="wrap">
+        {categories.length === 0 && <p className="notice">The menu is being updated. Please check back soon{s.phone ? <> or call {s.phone}</> : null}.</p>}
         {categories.map((c) => (
           <section key={c.id} id={c.slug} className="cat">
             <h2>{c.name}</h2>
@@ -56,12 +62,12 @@ export default async function Home() {
         ))}
       </main>
 
-      <CartBar currency={cur} deliveryFee={Number(s.delivery_fee)} fulfillment={s.enabled_fulfillment.filter((m) => m !== "delivery" || s.delivery_enabled)} open={s.accepting_orders} />
+      <CartBar menu={snapshot} currency={cur} deliveryFee={Number(s.delivery_fee)} fulfillment={s.enabled_fulfillment.filter((m) => m !== "delivery" || s.delivery_enabled)} open={s.accepting_orders} />
 
       <footer className="foot">
         <div className="wrap">
           <h2>Visit or call</h2>
-          <p>{s.address}<br />{s.phone}</p>
+          <p>{s.address}{s.address && s.phone && <br />}{s.phone}</p>
           {s.delivery_enabled && <p>Delivery available for {formatMoney(s.delivery_fee, cur)}.</p>}
           <table><tbody>{DAYS.map(([k, label]) => (<tr key={k}><th scope="row">{label}</th><td>{s.opening_hours[k] ? `${s.opening_hours[k]![0]} to ${s.opening_hours[k]![1]}` : "Closed"}</td></tr>))}</tbody></table>
         </div>

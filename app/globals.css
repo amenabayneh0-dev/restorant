@@ -47,3 +47,15 @@ input[type=radio],input[type=checkbox]{width:20px;height:20px;accent-color:var(-
 .steps{display:grid;gap:8px;list-style:none;padding:0;margin:24px 0}.steps li{padding:12px 14px;border:1px solid var(--line);border-radius:8px;color:var(--muted)}
 .steps li.done{color:var(--ink);border-color:var(--green)}.steps li.done::before{content:"\2713  "}.steps li.now{border:2px solid var(--saffron);color:var(--ink);font-weight:700}
 body{padding-bottom:80px}
+.notice{margin:16px 0;padding:12px 14px;border:1px solid var(--saffron);border-radius:8px;background:var(--panel)}.notice p{margin:2px 0}
+/* staff */
+.staff{padding-top:28px;padding-bottom:64px}.staff h1{font-size:1.8rem}.staff-top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.staff .btn.small{padding:6px 12px;min-height:36px;font-size:.9rem}.staff form{display:inline}
+.ocard{border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:14px 16px;margin:14px 0}.ocard.new{border-color:var(--saffron);border-width:2px}
+.ocard header{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}.ocard h3{font-size:1.15rem}
+.ocard ul{margin:8px 0}.ocard li{padding:6px 0;border-top:1px dashed var(--line)}.ocard li small{display:block;color:var(--muted)}
+.acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.acts .btn.go{background:var(--saffron);color:#16110e;font-weight:700}
+.badge{font:600 .8rem var(--sans);padding:2px 8px;border-radius:99px;border:1px solid var(--line);color:var(--muted)}
+.stock{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line)}
+details.panel{border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin:16px 0;background:var(--panel)}summary{cursor:pointer;font-weight:700;min-height:36px}
+.login{max-width:380px;margin:12vh auto 0}

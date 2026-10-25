@@ -3,19 +3,33 @@ import { orderInputSchema } from "@/lib/validation";
 import { hashToken, trackingTokenFor } from "@/lib/token";
 import { friendlyOrderError } from "@/lib/errors";
 import { adminClient } from "@/lib/supabase-admin";
+import { trackingSecret } from "@/lib/env";
 
 export type PlaceOrderResult =
   | { ok: true; reference: string; trackingPath: string }
   | { ok: false; message: string; fieldErrors?: Record<string, string[] | undefined> };
 
+const SETUP_MESSAGE = "Online ordering isn't available right now. Please call the restaurant.";
+
 export async function placeOrder(input: unknown): Promise<PlaceOrderResult> {
   const parsed = orderInputSchema.safeParse(input);
   if (!parsed.success)
     return { ok: false, message: "Please check the highlighted fields.", fieldErrors: parsed.error.flatten().fieldErrors };
-
   const v = parsed.data;
-  const token = trackingTokenFor(v.idempotencyKey, process.env.TRACKING_TOKEN_SECRET ?? "");
-  const { data, error } = await adminClient().rpc("create_order", {
+
+  // Server misconfiguration must produce a readable message for the customer and a clear log line for the owner,
+  // not an unhandled exception.
+  let token: string;
+  let db: ReturnType<typeof adminClient>;
+  try {
+    token = trackingTokenFor(v.idempotencyKey, trackingSecret() ?? "");
+    db = adminClient();
+  } catch (e) {
+    console.error("[placeOrder] server configuration problem:", e instanceof Error ? e.message : e);
+    return { ok: false, message: SETUP_MESSAGE };
+  }
+
+  const { data, error } = await db.rpc("create_order", {
     p_idempotency_key: v.idempotencyKey,
     p_token_hash: hashToken(token),
     p_customer_name: v.customerName,
@@ -31,6 +45,9 @@ export async function placeOrder(input: unknown): Promise<PlaceOrderResult> {
       option_ids: i.optionIds, instructions: i.instructions ?? null,
     })),
   });
-  if (error) return { ok: false, message: friendlyOrderError(error.message) };
+  if (error) {
+    console.error("[placeOrder] create_order failed:", error.message);
+    return { ok: false, message: friendlyOrderError(error.message) };
+  }
   return { ok: true, reference: data as string, trackingPath: `/track/${token}` };
 }
