@@ -81,3 +81,16 @@ describe("status", () => {
     expect(isFinal("cancelled")).toBe(true); expect(isFinal("ready")).toBe(false);
   });
 });
+
+import { actionsFor, visibleStatuses, isStatus, friendlyStatusError } from "../lib/transitions";
+describe("staff actions (UI mirror of database rules)", () => {
+  const to = (st: string, r: "admin" | "counter" | "kitchen") => actionsFor(st, r).map((a) => a.to);
+  it("counter handles intake and handover", () => { expect(to("pending", "counter")).toEqual(["accepted", "rejected"]); expect(to("ready", "counter")).toContain("completed"); });
+  it("kitchen cannot accept, reject, complete or cancel", () => {
+    expect(to("pending", "kitchen")).toEqual([]); expect(to("ready", "kitchen")).toEqual([]);
+    expect(to("accepted", "kitchen")).toEqual(["preparing"]); expect(to("preparing", "kitchen")).toEqual(["ready"]);
+  });
+  it("final states offer no actions", () => { for (const st of ["completed", "rejected", "cancelled"]) expect(to(st, "admin")).toEqual([]); });
+  it("kitchen never sees pending orders", () => { expect(visibleStatuses("kitchen")).not.toContain("pending"); expect(visibleStatuses("counter")).toContain("pending"); });
+  it("rejects unknown statuses and hides raw errors", () => { expect(isStatus("pending")).toBe(false); expect(isStatus("DROP")).toBe(false); expect(friendlyStatusError("syntax error at x")).toBe("Couldn't update the order. Try again."); });
+});

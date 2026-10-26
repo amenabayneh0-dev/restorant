@@ -1,115 +1,68 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { staffClient } from "@/lib/supabase-staff";
+import { serverClient } from "@/lib/supabase-server";
+import { actionsFor, visibleStatuses, type Role } from "@/lib/transitions";
+import { LABEL } from "@/lib/status";
 import { formatMoney } from "@/lib/money";
-import { LABEL, actionsFor, isFinal, type StaffRole } from "@/lib/status";
 import { AutoRefresh } from "@/components/AutoRefresh";
-import { setAccepting, setAvailable, setStatus, signOut } from "./actions";
+import { SoundAlert } from "@/components/SoundAlert";
+import { changeStatus, logout } from "./actions";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Orders", robots: { index: false, follow: false } };
-
-type Order = {
-  id: string; reference: string; status: string; fulfillment: string; customer_name: string; customer_phone: string;
-  table_number: string | null; delivery_address: string | null; note: string | null; total: number; currency_code: string; created_at: string;
-  order_items: { item_name: string; quantity: number; selected_options: { name: string }[]; instructions: string | null }[];
-};
-const ERR: Record<string, string> = {
-  forbidden: "Your role isn't allowed to do that.", failed: "That didn't work. The order may have changed; the list was refreshed.", bad: "Invalid request.",
-};
+type Order = { id: string; reference: string; customer_name: string; customer_phone: string; fulfillment: string; table_number: string | null; delivery_address: string | null;
+  note: string | null; status: string; total: number; currency_code: string; created_at: string;
+  order_items: { item_name: string; quantity: number; selected_options: { name: string }[]; instructions: string | null }[] };
 const HOW: Record<string, string> = { pickup: "Pickup", dine_in: "Dine in", delivery: "Delivery" };
 
-export default async function Staff({ searchParams }: { searchParams: Promise<{ err?: string }> }) {
-  const { err } = await searchParams;
-  const db = await staffClient();
-  const { data: auth } = await db.auth.getUser();
-  if (!auth.user) redirect("/staff/login");
+export default async function Staff({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
+  const { error } = await searchParams;
+  const sb = await serverClient();
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) redirect("/staff/login");
+  const { data: profile } = await sb.from("staff_profiles").select("display_name,role").eq("user_id", user.id).maybeSingle();
+  if (!profile) return (
+    <main className="wrap" style={{ paddingTop: "12vh" }}><h1>No staff access</h1><p>This account isn't set up as staff. Ask the owner to add you.</p>
+      <form action={logout}><button className="btn">Sign out</button></form></main>);
 
-  const { data: roleData } = await db.rpc("current_staff_role");
-  const role = roleData as StaffRole | null;
-  if (!role) {
-    return (
-      <main className="wrap staff">
-        <h1>No access</h1>
-        <p>You're signed in as {auth.user.email}, but this account hasn't been given a staff role yet. Ask the administrator to add you.</p>
-        <form action={signOut}><button className="btn">Sign out</button></form>
-      </main>
-    );
-  }
-
-  const [{ data: orders }, { data: settings }, { data: items }] = await Promise.all([
-    db.from("orders")
-      .select("id,reference,status,fulfillment,customer_name,customer_phone,table_number,delivery_address,note,total,currency_code,created_at,order_items(item_name,quantity,selected_options,instructions)")
-      .order("created_at", { ascending: false }).limit(100),
-    db.from("restaurant_settings").select("accepting_orders,timezone").maybeSingle(),
-    role === "admin" ? db.from("menu_items").select("id,name,is_available").order("name") : Promise.resolve({ data: null }),
-  ]);
-  const all = (orders ?? []) as unknown as Order[];
-  const active = all.filter((o) => !isFinal(o.status)).reverse(); // oldest first: that's who has waited longest
-  const done = all.filter((o) => isFinal(o.status)).slice(0, 15);
-  const tz = settings?.timezone ?? "UTC";
-  const time = (iso: string) => new Intl.DateTimeFormat("en-GB", { timeZone: tz, hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
-
-  const card = (o: Order) => (
-    <article key={o.id} className={`ocard ${o.status === "pending" ? "new" : ""}`}>
-      <header>
-        <h3>{o.reference} · {o.customer_name}</h3>
-        <span><span className="badge">{LABEL[o.status] ?? o.status}</span> <span className="badge">{HOW[o.fulfillment]}{o.table_number ? ` ${o.table_number}` : ""}</span> <span className="badge">{time(o.created_at)}</span></span>
-      </header>
-      <p className="muted"><a href={`tel:${o.customer_phone}`}>{o.customer_phone}</a>{o.delivery_address ? ` · ${o.delivery_address}` : ""}</p>
-      <ul>
-        {o.order_items.map((it, i) => (
-          <li key={i}><b>{it.quantity} × {it.item_name}</b>
-            {it.selected_options.length > 0 && <small>{it.selected_options.map((x) => x.name).join(", ")}</small>}
-            {it.instructions && <small>“{it.instructions}”</small>}</li>
-        ))}
-      </ul>
-      {o.note && <p><b>Note:</b> {o.note}</p>}
-      <p><strong>{formatMoney(o.total, o.currency_code)}</strong> <span className="muted">pay on receipt</span></p>
-      <div className="acts">
-        {actionsFor(o.status, role).map((a, i) => (
-          <form key={a.to} action={setStatus}>
-            <input type="hidden" name="orderId" value={o.id} /><input type="hidden" name="to" value={a.to} />
-            <button className={`btn small ${i === 0 ? "go" : ""}`}>{a.label}</button>
-          </form>
-        ))}
-      </div>
-    </article>
-  );
+  const role = profile.role as Role;
+  const { data } = await sb.from("orders")
+    .select("id,reference,customer_name,customer_phone,fulfillment,table_number,delivery_address,note,status,total,currency_code,created_at,order_items(item_name,quantity,selected_options,instructions)")
+    .in("status", visibleStatuses(role)).order("created_at", { ascending: true });
+  const orders = (data ?? []) as unknown as Order[];
+  const pending = orders.filter((o) => o.status === "pending").length;
+  const now = Date.now();
 
   return (
-    <main className="wrap staff">
-      <AutoRefresh seconds={10} />
-      <div className="staff-top">
-        <h1>Orders <span className="badge">{role}</span></h1>
-        <form action={signOut}><button className="btn small">Sign out</button></form>
+    <main className="wrap board">
+      <AutoRefresh seconds={8} />
+      <div className="sheet-top">
+        <h1>{role === "kitchen" ? "Kitchen" : "Orders"}</h1>
+        <form action={logout}><button className="btn">Sign out ({profile.display_name})</button></form>
       </div>
-      {err && <p className="notice" role="alert">{ERR[err] ?? ERR.failed}</p>}
-
-      {role === "admin" && settings && (
-        <form action={setAccepting} className="notice">
-          Online orders are <b>{settings.accepting_orders ? "ON" : "PAUSED"}</b>.{" "}
-          <input type="hidden" name="value" value={String(!settings.accepting_orders)} />
-          <button className="btn small">{settings.accepting_orders ? "Pause orders" : "Resume orders"}</button>
-        </form>
-      )}
-
-      <h2>Active ({active.length})</h2>
-      {active.length === 0 ? <p className="muted">No active orders. This page refreshes by itself.</p> : active.map(card)}
-
-      {role === "admin" && items && (
-        <details className="panel"><summary>Sold-out switches</summary>
-          {items.map((it) => (
-            <form key={it.id} action={setAvailable} className="stock">
-              <span>{it.name}{!it.is_available && <b className="err"> · sold out</b>}</span>
-              <input type="hidden" name="itemId" value={it.id} /><input type="hidden" name="value" value={String(!it.is_available)} />
-              <button className="btn small">{it.is_available ? "Mark sold out" : "Back in stock"}</button>
-            </form>
-          ))}
-        </details>
-      )}
-
-      <details className="panel"><summary>Recently finished ({done.length})</summary>{done.map(card)}</details>
+      <p><SoundAlert pending={pending} /></p>
+      {error && <p className="err" role="alert">{error}</p>}
+      {orders.length === 0 && <p className="muted">No active orders. New ones appear here automatically.</p>}
+      {orders.map((o) => {
+        const mins = Math.max(0, Math.floor((now - new Date(o.created_at).getTime()) / 60000));
+        return (
+          <article key={o.id} className={`ocard s-${o.status}`}>
+            <header><b>{o.reference}</b><span className="tag">{LABEL[o.status]}</span><span className="muted">{mins} min ago</span></header>
+            <p><b>{HOW[o.fulfillment]}</b>{o.table_number && ` · Table ${o.table_number}`} · {o.customer_name}
+              {role !== "kitchen" && <> · <a href={`tel:${o.customer_phone}`}>{o.customer_phone}</a></>}</p>
+            {role !== "kitchen" && o.delivery_address && <p>Deliver to: {o.delivery_address}</p>}
+            <ul className="lines">
+              {o.order_items.map((it, i) => (<li key={i}><div><b>{it.quantity} × {it.item_name}</b>{it.selected_options.length > 0 && <small>{it.selected_options.map((x) => x.name).join(", ")}</small>}{it.instructions && <small>Note: {it.instructions}</small>}</div></li>))}
+            </ul>
+            {o.note && <p className="note-k">Order note: {o.note}</p>}
+            {role !== "kitchen" && <p><b>{formatMoney(o.total, o.currency_code)}</b> · collect on {o.fulfillment === "delivery" ? "delivery" : "receipt"}</p>}
+            <div className="acts">
+              {actionsFor(o.status, role).map((a) => (
+                <form key={a.to} action={changeStatus}><input type="hidden" name="id" value={o.id} /><input type="hidden" name="to" value={a.to} />
+                  <button className={a.tone === "primary" ? "btn solid" : "btn danger"}>{a.label}</button></form>))}
+            </div>
+          </article>);
+      })}
     </main>
   );
 }

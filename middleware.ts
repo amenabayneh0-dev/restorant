@@ -1,24 +1,20 @@
-import { createServerClient } from "@supabase/ssr";
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { publicKey, supabaseUrl } from "@/lib/env";
 
-// Keeps the staff login session fresh (access tokens expire hourly). Only runs on /staff pages.
+// Keeps staff sessions fresh. Only runs on /staff pages.
 export async function middleware(req: NextRequest) {
-  const url = supabaseUrl();
-  const key = publicKey();
-  if (!url || !key) return NextResponse.next();
   let res = NextResponse.next({ request: req });
-  const supabase = createServerClient(url, key, {
+  const sb = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!, {
     cookies: {
       getAll: () => req.cookies.getAll(),
-      setAll: (list) => {
+      setAll: (list: { name: string; value: string; options: CookieOptions }[]) => {
         list.forEach(({ name, value }) => req.cookies.set(name, value));
         res = NextResponse.next({ request: req });
         list.forEach(({ name, value, options }) => res.cookies.set(name, value, options));
       },
     },
   });
-  try { await supabase.auth.getUser(); } catch {}
+  await sb.auth.getUser();
   return res;
 }
 export const config = { matcher: ["/staff/:path*"] };
