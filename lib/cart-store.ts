@@ -28,3 +28,6 @@ export const cartActions = {
 };
 export const useCart = () =>
   useSyncExternalStore((cb) => { listeners.add(cb); return () => listeners.delete(cb); }, () => cart, () => EMPTY);
+
+/** Small confirmation message shown above the cart bar (listened to by CartBar). */
+export const toast = (message: string) => { if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("mf:toast", { detail: message })); };

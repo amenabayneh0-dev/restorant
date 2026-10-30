@@ -10,6 +10,7 @@ export PGDATABASE="$DB"
 $P -f supabase/tests/stubs.sql
 $P -f supabase/migrations/0001_schema.sql
 $P -f supabase/migrations/0002_hardening.sql
+$P -f supabase/migrations/0003_features.sql
 $P -f supabase/seed.sql
 $P -f supabase/seed.sql   # seed must be safe to re-run
 $P -f supabase/tests/order_flow.sql

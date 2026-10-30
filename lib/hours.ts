@@ -38,3 +38,20 @@ export function openStatus(hours: Hours, timezone: string, now: Date = new Date(
   }
   return { open: false, opensAt: range?.[0], closesAt: range?.[1], next };
 }
+
+export function todayKey(timezone: string, now: Date = new Date()): keyof Hours {
+  return new Intl.DateTimeFormat("en-US", { timeZone: timezone, weekday: "short" }).format(now).toLowerCase().slice(0, 3) as keyof Hours;
+}
+
+/** Collapses the week into readable groups: [{ days: "Mon – Thu", range: "11:00 – 22:00" }, { days: "Sun", range: "Closed" }]. */
+export function groupHours(hours: Hours): { days: string; range: string }[] {
+  const order: [keyof Hours, string][] = [["mon", "Mon"], ["tue", "Tue"], ["wed", "Wed"], ["thu", "Thu"], ["fri", "Fri"], ["sat", "Sat"], ["sun", "Sun"]];
+  const out: { from: string; to: string; range: string }[] = [];
+  for (const [k, label] of order) {
+    const h = hours[k];
+    const range = h ? `${h[0]} – ${h[1]}` : "Closed";
+    const last = out[out.length - 1];
+    if (last && last.range === range) last.to = label; else out.push({ from: label, to: label, range });
+  }
+  return out.map((g) => ({ days: g.from === g.to ? g.from : `${g.from} – ${g.to}`, range: g.range }));
+}
