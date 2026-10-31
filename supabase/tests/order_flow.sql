@@ -4,11 +4,11 @@
 \o /dev/null
 create temp table _log(msg text);
 create function pg_temp.ok(cond boolean, name text) returns void language plpgsql as $$
-begin if cond is not true then raise exception 'FAILED: %', name; end if; insert into _log values (name); end $$;
+begin if cond is not true then raise exception 'FAILED: %', name; end if; insert into _log values (name); raise notice 'CHECK: %', name; end $$;
 create function pg_temp.raises(code text, sql text, name text) returns void language plpgsql as $$
 begin
   begin execute sql; exception when others then
-    if sqlerrm like '%' || code || '%' then insert into _log values (name); return; end if;
+    if sqlerrm like '%' || code || '%' then insert into _log values (name); raise notice 'CHECK: %', name; return; end if;
     raise exception 'FAILED: % (expected %, got %)', name, code, sqlerrm;
   end;
   raise exception 'FAILED: % (expected % but statement succeeded)', name, code;
@@ -127,5 +127,52 @@ begin;
   select pg_temp.raises('permission denied', $q$update staff_profiles set role = 'admin'$q$, 'nobody can edit staff roles via the API');
 rollback;
 
+-- ---------- Phase 4: staff product (menu editor, settings, report reads) ----------
+begin;
+  select pg_temp.as_user('00000000-0000-0000-0000-0000000000a1','authenticated');
+  insert into menu_categories(name, slug, sort_order) values ('Desserts P4', 'desserts-p4', 990);
+  select pg_temp.ok((select count(*) from menu_categories where slug='desserts-p4') = 1, 'admin can add a category');
+  insert into menu_items(category_id, name, slug, price, tags, is_published) values
+    ((select id from menu_categories where slug='desserts-p4'), 'Hidden Draft', 'hidden-draft-p4', 55.50, '{vegan,fasting}', false);
+  select pg_temp.ok((select price from menu_items where slug='hidden-draft-p4') = 55.50, 'admin can add a dish (draft, with tags)');
+  select pg_temp.raises('menu_items_tags_valid', $q$update menu_items set tags='{bogus}' where slug='hidden-draft-p4'$q$, 'unknown tag is rejected by the database');
+  select pg_temp.raises('menu_items_price_check', $q$update menu_items set price=-1 where slug='hidden-draft-p4'$q$, 'negative price is rejected by the database');
+  insert into menu_item_options(menu_item_id, group_name, name, extra_price) values ((select id from menu_items where slug='hidden-draft-p4'), 'SizeP4', 'LargeP4', 20);
+  select pg_temp.ok((select count(*) from menu_item_options where group_name='SizeP4' and name='LargeP4') = 1, 'admin can add an option');
+  delete from menu_item_options where group_name='SizeP4' and name='LargeP4';
+  select pg_temp.ok((select count(*) from menu_item_options where group_name='SizeP4' and name='LargeP4') = 0, 'admin can remove an option');
+  update menu_items set archived_at = now(), is_published = false where slug='hidden-draft-p4';
+  select pg_temp.ok((select archived_at from menu_items where slug='hidden-draft-p4') is not null, 'admin can archive a dish');
+  update restaurant_settings set tagline='Hi', delivery_fee=30, opening_hours='{"mon":["11:00","22:00"]}'::jsonb, hero_image_url='http://x/y.webp';
+  select pg_temp.ok((select delivery_fee from restaurant_settings) = 30 and (select hero_image_url from restaurant_settings) = 'http://x/y.webp', 'admin can edit settings, hours and hero photo');
+rollback;
+
+begin;
+  select pg_temp.as_user('00000000-0000-0000-0000-0000000000b1','authenticated');
+  select pg_temp.raises('row-level security', $q$insert into menu_categories(name, slug) values ('Nope','nope-p4')$q$, 'kitchen cannot add a category');
+  select pg_temp.raises('row-level security', $q$insert into menu_items(category_id,name,slug,price) values ((select id from menu_categories limit 1),'Nope','nope-p4',1)$q$, 'kitchen cannot add a dish');
+  select pg_temp.raises('row-level security', $q$insert into menu_item_options(menu_item_id,group_name,name) values ((select id from menu_items limit 1),'G','N')$q$, 'kitchen cannot add options');
+  update restaurant_settings set name = 'Hacked';
+  select pg_temp.ok((select name from restaurant_settings) <> 'Hacked', 'kitchen cannot edit settings');
+rollback;
+
+begin;
+  select pg_temp.as_user('00000000-0000-0000-0000-0000000000c1','authenticated');
+  select pg_temp.raises('row-level security', $q$insert into menu_categories(name, slug) values ('Nope','nope2-p4')$q$, 'counter cannot add a category');
+  update restaurant_settings set name = 'Hacked';
+  select pg_temp.ok((select name from restaurant_settings) <> 'Hacked', 'counter cannot edit settings');
+  select pg_temp.ok((select count(*) from orders) >= 2 and (select count(*) from order_items) >= 2, 'counter can read orders + items (sales report)');
+rollback;
+
+-- Visibility: drafts and archived dishes are staff-only
+begin;
+  select pg_temp.as_user('00000000-0000-0000-0000-0000000000a1','authenticated');
+  insert into menu_items(category_id, name, slug, price, is_published) values ((select id from menu_categories limit 1), 'Draft P4', 'draft-p4', 5, false);
+  insert into menu_items(category_id, name, slug, price, is_published, archived_at) values ((select id from menu_categories limit 1), 'Old P4', 'old-p4', 5, true, now());
+  select pg_temp.ok((select count(*) from menu_items where slug in ('draft-p4','old-p4')) = 2, 'staff can see drafts and archived dishes');
+  select pg_temp.as_user(null,'anon');
+  select pg_temp.ok((select count(*) from menu_items where slug in ('draft-p4','old-p4')) = 0, 'visitors cannot see drafts or archived dishes');
+rollback;
+
 \o
-select count(*) || ' database checks passed' as result from _log;
+select 'all checks passed' as result;

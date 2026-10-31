@@ -1,6 +1,6 @@
 # Restaurant ordering site (Next.js + Supabase + Vercel)
 
-Dark claymorphism design, GSAP + Motion animation, direct ordering (pickup / dine-in / delivery, pay on receipt), live order tracking, staff order board. **See `HANDOFF.md` for current status, what is left, and what is needed.**
+Dark claymorphism design, GSAP + Motion animation, direct ordering (pickup / dine-in / delivery, pay on receipt), live order tracking, staff order board, menu editor (with photo upload), settings/opening hours and a 7-day sales report. **See `HANDOFF.md` for current status, what is left, and what is needed.**
 
 ## Deploy (your only job)
 1. Push this repo to GitHub, then Vercel > Add New > Project > import it (Framework: Next.js, Root: repo root).
@@ -11,4 +11,4 @@ Dark claymorphism design, GSAP + Motion animation, direct ordering (pickup / din
 Without `SUPABASE_DB_URL` the automatic setup is skipped; run `supabase/migrations/0001..0003_*.sql` in the Supabase SQL editor instead (skip `seed.sql` on production).
 
 ## Test
-`npm test` (unit/component), `npm run test:db` (needs local PostgreSQL), `npm run test:e2e` (headless Chrome against `BASE_URL`).
+`npm test` (unit/component), `npm run test:db` (needs local PostgreSQL), `npm run test:e2e` and `npm run test:e2e:staff` (headless Chrome against `BASE_URL`).

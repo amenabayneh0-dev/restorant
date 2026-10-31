@@ -1,6 +1,6 @@
 # HANDOFF: read this first (for the next chat)
 
-Paste this whole file (or upload the zip) into a new chat and say: **"Continue from HANDOFF.md, starting at Phase 4."**
+Paste this whole file (or upload the zip) into a new chat and say: **"Continue from HANDOFF.md, starting at Phase 6 (push + verify on Vercel)."**
 
 ---
 ## 1. What this project is
@@ -22,11 +22,21 @@ The restaurant's real name/menu are unknown; the database holds them (editable),
 | 1 | Zero-touch deploy: migrations 0001-0003, `scripts/bootstrap.mjs`, health check | DONE + tested |
 | 2 | Design system + motion foundation (dark clay CSS, fonts, GSAP/Motion) | DONE |
 | 3 | Customer site (hero, bento, menu, item sheet, cart, checkout, tracking, SEO) | DONE + browser-tested |
-| **4** | **Staff product: menu editor, photo upload, settings/hours, sales report, order alerts** | **NOT STARTED (the main remaining work)** |
-| 5 | Final verification: staff E2E, screenshot review of every page, a11y on staff pages | partly done (customer side only) |
+| 4 | Staff product: StaffNav, order alerts, menu editor (categories, dishes, options, archive), photo upload with client-side resize, settings + hours, 7-day sales report | **DONE + tested** (see section 3b) |
+| 5 | Final verification: staff E2E, screenshots, a11y on staff pages | DONE for staff + customer pages (phone 390px + desktop 1366px) |
 | 6 | Ship: update docs/checklist, push to GitHub, verify on Vercel | **NOT DONE: nothing from phases 1-3 is pushed** |
 
 **GitHub `main` is still commit `19b1949` (the earlier "production hardening" version). All newer work exists only in this zip.**
+
+## 3b. Phase 4 result (verified in the sandbox, local stand-in stack, not real Supabase)
+- `npx tsc --noEmit` clean. `npm test`: **85/85** (23 new in `tests/staff.test.ts`: zod schemas, slugify, hours parsing, image signature sniffing, report maths incl. Addis-day bucketing).
+- `npm run test:db`: **58 checks** (the old "27" under-counted because checks inside rolled-back transactions weren't logged; `scripts/test-db.sh` now counts a NOTICE per check). New: admin menu/option/settings writes, kitchen/counter blocked, drafts + archived dishes hidden from visitors, counter can read orders for the report.
+- `npm run test:e2e`: **31/31** customer site. `npm run test:e2e:staff` (new, `e2e/staff.mjs`): **45/45** (admin on phone + desktop, kitchen + counter role limits, signed-out redirects, add category/move, create dish with a 3200px photo -> resized to <=1600px, options add/remove, publish toggle, archive/restore, settings + hours persist, bad time zone refused, report KPIs, axe WCAG A/AA on every staff page, no horizontal overflow, no console errors).
+- Report numbers cross-checked against the database with real `create_order` rows (rejected excluded, avg = revenue/orders).
+- Bugs found and fixed while testing: empty price silently saved as 0 (now rejected); `.staff form{display:inline}` collapsed layout forms (now overridden; E2E regression check added).
+- **Not verified:** anything on real Supabase/Vercel (sandbox cannot reach them); real Supabase Storage upload of the `menu` bucket (only the fake Storage in `dev/local-stack/proxy.js`); browser notification permission prompts (only the enable-alerts UI is tested, not actual sound/notification output).
+- New files: `lib/staff-schemas.ts`, `lib/report.ts`, `lib/staff-auth.ts`, `lib/upload.ts`, `lib/image-resize.ts`, `components/staff/{StaffNav,OrderAlerts,ImageField,Flash}.tsx`, `app/staff/{menu,menu/[id],settings,report}`.
+- Design notes: dishes/categories are archived, never deleted (past orders keep names). Category order uses up/down buttons (no drag). Delivery on/off is derived from whether "Delivery" is ticked in Settings. Uploads go through a server action that checks the admin role, validates the real file signature, and stores in the public `menu` bucket.
 
 ## 4. Verified results (run in the sandbox before packaging)
 - `npx tsc --noEmit`: clean. `npm test`: **62/62** unit + component tests pass.
@@ -89,6 +99,7 @@ npm run dev                # local dev (needs .env.local, see .env.example)
 npm run build              # must succeed even with NO env vars
 npm test                   # unit + component tests (62)
 npm run test:db            # needs local PostgreSQL (PGHOST/PGUSER set); throwaway DB
+npm run test:e2e:staff     # needs the 3 staff logins (see e2e/staff.mjs header)
 npm run test:e2e           # BASE_URL=... ; E2E_PLACE_ORDER=1 to place a real order; STAFF_EMAIL/PASSWORD for staff flow
 node e2e/shots.mjs phone   # scroll-series screenshots into e2e/shots/ (git-ignored)
 npm run setup:db           # run the setup script by hand
@@ -117,4 +128,4 @@ Traps learned the hard way:
 - The sandbox cannot reach supabase.co or image sites: no live Supabase work, no stock-photo downloads (hence illustrations + upload feature).
 
 ## 11. Starter prompt for the next chat
-> I'm continuing a project. Read HANDOFF.md first, then `docs/PLAN.md`. Phases 0-3 are done; start at **Phase 4 (staff product)**, then Phases 5-6. Use the Claymorphism design in `docs/design-reference.png` for every new screen. Build each feature, test it (unit, DB, browser E2E with screenshots on phone + desktop), look at the screenshots, fix problems, and only then move on. Re-run the full suites at the end and report only what you verified. I will give you a fresh GitHub token limited to the repo for the final push. My only job is deploying on Vercel, so keep the zero-touch setup working.
+> I'm continuing a project. Read HANDOFF.md first, then `docs/PLAN.md`. Phases 0-5 are done; start at **Phase 6 (push to GitHub + verify on Vercel)**. Use the Claymorphism design in `docs/design-reference.png` for every new screen. Build each feature, test it (unit, DB, browser E2E with screenshots on phone + desktop), look at the screenshots, fix problems, and only then move on. Re-run the full suites at the end and report only what you verified. I will give you a fresh GitHub token limited to the repo for the final push. My only job is deploying on Vercel, so keep the zero-touch setup working.

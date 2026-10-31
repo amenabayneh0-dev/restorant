@@ -4,6 +4,8 @@ import { staffClient } from "@/lib/supabase-staff";
 import { formatMoney } from "@/lib/money";
 import { LABEL, actionsFor, isFinal, type StaffRole } from "@/lib/status";
 import { AutoRefresh } from "@/components/AutoRefresh";
+import { StaffNav } from "@/components/staff/StaffNav";
+import { OrderAlerts } from "@/components/staff/OrderAlerts";
 import { setAccepting, setAvailable, setStatus, signOut } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -80,10 +82,9 @@ export default async function Staff({ searchParams }: { searchParams: Promise<{ 
   return (
     <main className="wrap staff">
       <AutoRefresh seconds={10} />
-      <div className="staff-top">
-        <h1>Orders <span className="badge">{role}</span></h1>
-        <form action={signOut}><button className="btn small">Sign out</button></form>
-      </div>
+      <StaffNav role={role} active="orders" />
+      <h1>Orders</h1>
+      <OrderAlerts pending={all.filter((o) => o.status === "pending").length} />
       {err && <p className="notice" role="alert">{ERR[err] ?? ERR.failed}</p>}
 
       {role === "admin" && settings && (

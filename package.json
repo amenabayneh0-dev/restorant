@@ -10,7 +10,8 @@
     "test:db": "bash scripts/test-db.sh",
     "vercel-build": "node scripts/bootstrap.mjs && next build",
     "setup:db": "node scripts/bootstrap.mjs",
-    "test:e2e": "node e2e/run.mjs"
+    "test:e2e": "node e2e/run.mjs",
+    "test:e2e:staff": "node e2e/staff.mjs"
   },
   "dependencies": {
     "@fontsource-variable/dancing-script": "^5.3.0",
