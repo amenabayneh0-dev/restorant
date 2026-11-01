@@ -98,3 +98,11 @@ describe("buildReport", () => {
   it("buckets by the restaurant's day, not UTC (21:30Z is already tomorrow in Addis)", () => { expect(dayKey("2026-10-29T21:30:00Z", tz)).toBe("2026-10-30"); });
   it("handles no orders without dividing by zero", () => { expect(buildReport([], tz, 7, now)).toMatchObject({ orders: 0, revenue: 0, average: 0, top: [] }); });
 });
+
+import { visibleStatuses } from "@/lib/status";
+describe("board visibility by role", () => {
+  it("kitchen never sees pending orders; front of house does", () => {
+    expect(visibleStatuses("kitchen")).toEqual(["accepted", "preparing", "ready"]);
+    for (const r of ["admin", "counter"] as const) expect(visibleStatuses(r)).toContain("pending");
+  });
+});

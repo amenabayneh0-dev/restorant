@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { staffClient } from "@/lib/supabase-staff";
 import { formatMoney } from "@/lib/money";
-import { LABEL, actionsFor, isFinal, type StaffRole } from "@/lib/status";
+import { LABEL, actionsFor, isFinal, visibleStatuses, type StaffRole } from "@/lib/status";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { StaffNav } from "@/components/staff/StaffNav";
 import { OrderAlerts } from "@/components/staff/OrderAlerts";
@@ -47,8 +47,11 @@ export default async function Staff({ searchParams }: { searchParams: Promise<{ 
     role === "admin" ? db.from("menu_items").select("id,name,is_available").order("name") : Promise.resolve({ data: null }),
   ]);
   const all = (orders ?? []) as unknown as Order[];
-  const active = all.filter((o) => !isFinal(o.status)).reverse(); // oldest first: that's who has waited longest
-  const done = all.filter((o) => isFinal(o.status)).slice(0, 15);
+  const shown = visibleStatuses(role);
+  const active = all.filter((o) => !isFinal(o.status) && shown.includes(o.status)).reverse(); // oldest first: that's who has waited longest
+  const done = role === "kitchen" ? [] : all.filter((o) => isFinal(o.status)).slice(0, 15);
+  // Counter/admin are alerted by new (pending) orders; the kitchen by orders that were just accepted for them to cook.
+  const alertCount = all.filter((o) => o.status === (role === "kitchen" ? "accepted" : "pending")).length;
   const tz = settings?.timezone ?? "UTC";
   const time = (iso: string) => new Intl.DateTimeFormat("en-GB", { timeZone: tz, hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
 
@@ -84,7 +87,7 @@ export default async function Staff({ searchParams }: { searchParams: Promise<{ 
       <AutoRefresh seconds={10} />
       <StaffNav role={role} active="orders" />
       <h1>Orders</h1>
-      <OrderAlerts pending={all.filter((o) => o.status === "pending").length} />
+      <OrderAlerts pending={alertCount} />
       {err && <p className="notice" role="alert">{ERR[err] ?? ERR.failed}</p>}
 
       {role === "admin" && settings && (

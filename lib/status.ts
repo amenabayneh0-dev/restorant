@@ -27,3 +27,7 @@ export const ACTIONS: Record<string, Action[]> = {
   ready: [{ to: "completed", label: "Complete", roles: FRONT }, CANCEL],
 };
 export const actionsFor = (status: string, role: StaffRole) => (ACTIONS[status] ?? []).filter((a) => a.roles.includes(role));
+
+/** Which active statuses a role's board lists. The kitchen only sees orders the counter has already accepted. */
+export const visibleStatuses = (role: StaffRole): string[] =>
+  role === "kitchen" ? ["accepted", "preparing", "ready"] : ["pending", "accepted", "preparing", "ready"];

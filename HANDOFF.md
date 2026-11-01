@@ -38,6 +38,10 @@ The restaurant's real name/menu are unknown; the database holds them (editable),
 - New files: `lib/staff-schemas.ts`, `lib/report.ts`, `lib/staff-auth.ts`, `lib/upload.ts`, `lib/image-resize.ts`, `components/staff/{StaffNav,OrderAlerts,ImageField,Flash}.tsx`, `app/staff/{menu,menu/[id],settings,report}`.
 - Design notes: dishes/categories are archived, never deleted (past orders keep names). Category order uses up/down buttons (no drag). Delivery on/off is derived from whether "Delivery" is ticked in Settings. Uploads go through a server action that checks the admin role, validates the real file signature, and stores in the public `menu` bucket.
 
+### 3c. Merge with origin/main commit a8b3f27
+`a8b3f27` ("Add staff sign-in, live order board… kitchen view", Oct 26) was a parallel, older take on the staff board built on the hardening base but with it stripped out (no 0002 migration, health route, lockfile, tests). Reviewed file by file: everything it adds (SoundAlert, role transitions, staff client) is already covered here by `OrderAlerts`, `lib/status.ts`, `lib/supabase-staff.ts`. The one idea not yet present, **kitchen only sees accepted/preparing/ready orders (and is alerted when an order is accepted)**, was added (`visibleStatuses`). Merged with `-s ours` so the commit stays in history and `main` can fast-forward, with none of its deletions applied.
+Note: the kitchen filter is UI only; RLS still lets kitchen staff read all orders. Tighten in a future migration if that matters.
+
 ## 4. Verified results (run in the sandbox before packaging)
 - `npx tsc --noEmit`: clean. `npm test`: **62/62** unit + component tests pass.
 - `npm run test:db`: **27/27** database checks (pricing, atomic rollback, spam throttle, role matrix, idempotency, migration 0003, seed re-runnable).
